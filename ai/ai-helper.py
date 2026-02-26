@@ -1,14 +1,27 @@
 #!/usr/bin/env python3
 
 """
-# Set env vars to use local LLM:
+AI Terminal Assistant
+Generates shell commands from natural language descriptions.
 
-export OPENAI_API_KEY="local" # or your OpenAI API key
-export AI_BASH_URL="http://localhost:11434/v1/chat/completions" # or your LLM API URL
-export AI_BASH_MODEL="qwen2.5:7b" # or your LLM model
+Environment Variables:
+    export OPENAI_API_KEY="your_key"
+    export AI_BASH_URL="https://api.openai.com/v1/chat/completions"
+    export AI_BASH_MODEL="gpt-4o-mini"
 
-# Add alias to your .bashrc or .zshrc:
-alias ai="python3 ~/.local/bin/tools/ai/ai-helper.py"
+Usage:
+    ai "list all files larger than 100MB"
+    ai "convert all png to jpg" -e
+    ai "how to check disk usage" -c
+
+Flags:
+    -e, --execute    Execute the generated command immediately
+    -c, --copy       Copy the command to clipboard and exit
+    -u, --url        Override the API URL
+    -m, --model      Override the model name
+
+Alias Recommendation (add to .bashrc or .zshrc):
+    alias ai="python3 /Users/maximshvaykovski/.local/bin/tools/ai/ai-helper.py"
 """
 
 import sys
@@ -136,6 +149,8 @@ def copy_to_clipboard(text: str):
 
 
 def main():
+    global API_URL, MODEL
+
     parser = argparse.ArgumentParser(
         description="AI-powered terminal assistant that generates shell commands from natural language.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -147,12 +162,21 @@ def main():
     parser.add_argument(
         "-c", "--copy", action="store_true", help="Copy command to clipboard and exit"
     )
+    parser.add_argument("-u", "--url", help="Override AI API URL")
+    parser.add_argument("-m", "--model", help="Override AI Model")
 
     if len(sys.argv) == 1:
+        print(__doc__)
         parser.print_help()
         sys.exit(0)
 
     args = parser.parse_args()
+
+    # Configuration overrides
+    if args.url:
+        API_URL = args.url
+    if args.model:
+        MODEL = args.model
 
     if not args.query:
         print(f"{RED}Error: No query provided.{RESET}")
@@ -176,7 +200,12 @@ def main():
         return
 
     if args.execute:
-        subprocess.call(cmd, shell=True)
+        try:
+            subprocess.run(cmd, shell=True, check=True)
+        except subprocess.CalledProcessError as e:
+            print(f"{RED}Command failed with exit code {e.returncode}{RESET}")
+        except Exception as e:
+            print(f"{RED}Error executing command: {e}{RESET}")
         return
 
     try:
@@ -186,7 +215,10 @@ def main():
         choice = input(prompt).strip().lower()
 
         if choice == "y":
-            subprocess.call(cmd, shell=True)
+            try:
+                subprocess.run(cmd, shell=True, check=True)
+            except subprocess.CalledProcessError as e:
+                print(f"{RED}Command failed with exit code {e.returncode}{RESET}")
         elif choice == "c":
             copy_to_clipboard(cmd)
             print("📋 Command copied to clipboard.")
