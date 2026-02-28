@@ -6,6 +6,7 @@ Generates shell commands from natural language descriptions.
 
 Environment Variables:
     export OPENAI_API_KEY="your_key"
+    export ANTHROPIC_API_KEY="your_key"
     export AI_BASH_URL="https://api.openai.com/v1/chat/completions"
     export AI_BASH_MODEL="gpt-4o-mini"
 
@@ -19,6 +20,7 @@ Flags:
     -c, --copy       Copy the command to clipboard and exit
     -u, --url        Override the API URL
     -m, --model      Override the model name
+    -p, --provider   AI provider (openai or anthropic)
 
 Alias Recommendation (add to .bashrc or .zshrc):
     alias ai="python3 /Users/maximshvaykovski/.local/bin/tools/ai/ai-helper.py"
@@ -59,15 +61,8 @@ def get_system_context():
         return "OS: macOS/Linux"
 
 
-def ask_ai(question: str) -> str:
+def ask_ai(question: str, provider: str) -> str:
     """Queries the AI for a terminal command."""
-    if not API_KEY and "openai.com" in API_URL:
-        print(
-            f"{RED}Error: OPENAI_API_KEY environment variable is not set.{RESET}",
-            file=sys.stderr,
-        )
-        sys.exit(1)
-
     ctx = get_system_context()
     system_prompt = (
         "You are a terminal command assistant. The user describes a task, and you provide the exact shell command. "
@@ -79,28 +74,65 @@ def ask_ai(question: str) -> str:
         "4. If multiple commands are needed, join them with && or |."
     )
 
-    payload = {
-        "model": MODEL,
-        "temperature": 0.1,
-        "max_tokens": 500,
-        "messages": [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": question},
-        ],
-    }
+    if provider == "anthropic":
+        anthropic_key = os.getenv("ANTHROPIC_API_KEY", "")
+        if not anthropic_key:
+            print(
+                f"{RED}Error: ANTHROPIC_API_KEY environment variable is not set.{RESET}",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+
+        url = "https://api.anthropic.com/v1/messages"
+        model = MODEL if MODEL != "gpt-4o-mini" else "claude-3-5-sonnet-20241022"
+        payload = {
+            "model": model,
+            "max_tokens": 500,
+            "temperature": 0.1,
+            "system": system_prompt,
+            "messages": [{"role": "user", "content": question}],
+        }
+        headers = {
+            "Content-Type": "application/json",
+            "x-api-key": anthropic_key,
+            "anthropic-version": "2023-06-01",
+        }
+    else:
+        if not API_KEY and "openai.com" in API_URL:
+            print(
+                f"{RED}Error: OPENAI_API_KEY environment variable is not set.{RESET}",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+
+        url = API_URL
+        payload = {
+            "model": MODEL,
+            "temperature": 0.1,
+            "max_tokens": 500,
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": question},
+            ],
+        }
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {API_KEY}",
+        }
 
     try:
         req = urllib.request.Request(
-            API_URL,
+            url,
             data=json.dumps(payload).encode(),
-            headers={
-                "Content-Type": "application/json",
-                "Authorization": f"Bearer {API_KEY}",
-            },
+            headers=headers,
         )
         with urllib.request.urlopen(req, timeout=20) as response:
             res_data = json.loads(response.read())
-            content = res_data["choices"][0]["message"]["content"].strip()
+
+            if provider == "anthropic":
+                content = res_data["content"][0]["text"].strip()
+            else:
+                content = res_data["choices"][0]["message"]["content"].strip()
 
             # Post-processing to remove any unwanted formatting
             if "```" in content:
@@ -164,6 +196,13 @@ def main():
     )
     parser.add_argument("-u", "--url", help="Override AI API URL")
     parser.add_argument("-m", "--model", help="Override AI Model")
+    parser.add_argument(
+        "-p",
+        "--provider",
+        choices=["openai", "anthropic"],
+        default="openai",
+        help="AI provider (openai for OpenAI/Local, anthropic for Claude)",
+    )
 
     if len(sys.argv) == 1:
         print(__doc__)
@@ -185,7 +224,7 @@ def main():
     query = " ".join(args.query)
 
     print(f"{BLUE}🔍 Thinking...{RESET}", end="\r")
-    cmd = ask_ai(query)
+    cmd = ask_ai(query, args.provider)
     print(" " * 20, end="\r")  # Clear "Thinking..." line
 
     if not cmd:
