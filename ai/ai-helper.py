@@ -7,6 +7,7 @@ Generates shell commands from natural language descriptions.
 Environment Variables:
     export OPENAI_API_KEY="your_key"
     export ANTHROPIC_API_KEY="your_key"
+    export OPENROUTER_API_KEY="your_key"
     export AI_BASH_URL="https://api.openai.com/v1/chat/completions"
     export AI_BASH_MODEL="gpt-4o-mini"
 
@@ -20,7 +21,7 @@ Flags:
     -c, --copy       Copy the command to clipboard and exit
     -u, --url        Override the API URL
     -m, --model      Override the model name
-    -p, --provider   AI provider (openai or anthropic)
+    -p, --provider   AI provider (openai, anthropic, or openrouter)
 
 Alias Recommendation (add to .bashrc or .zshrc):
     alias ai="python3 /Users/maximshvaykovski/.local/bin/tools/ai/ai-helper.py"
@@ -96,6 +97,32 @@ def ask_ai(question: str, provider: str) -> str:
             "Content-Type": "application/json",
             "x-api-key": anthropic_key,
             "anthropic-version": "2023-06-01",
+        }
+    elif provider == "openrouter":
+        openrouter_key = os.getenv("OPENROUTER_API_KEY", "")
+        if not openrouter_key:
+            print(
+                f"{RED}Error: OPENROUTER_API_KEY environment variable is not set.{RESET}",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+
+        url = "https://openrouter.ai/api/v1/chat/completions"
+        model = MODEL if MODEL != "gpt-4o-mini" else "google/gemini-flash-1.5"
+        payload = {
+            "model": model,
+            "temperature": 0.1,
+            "max_tokens": 500,
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": question},
+            ],
+        }
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {openrouter_key}",
+            "HTTP-Referer": "https://github.com/maximshvaykovski/ai-helper",
+            "X-Title": "AI Terminal Assistant",
         }
     else:
         if not API_KEY and "openai.com" in API_URL:
@@ -199,9 +226,9 @@ def main():
     parser.add_argument(
         "-p",
         "--provider",
-        choices=["openai", "anthropic"],
+        choices=["openai", "anthropic", "openrouter"],
         default="openai",
-        help="AI provider (openai for OpenAI/Local, anthropic for Claude)",
+        help="AI provider (openai for OpenAI/Local, anthropic for Claude, openrouter for OpenRouter)",
     )
 
     if len(sys.argv) == 1:
