@@ -17,6 +17,7 @@ Usage:
     ai "how to check disk usage" -c
 
 Flags:
+    -a, --ask        Ask for an explanation instead of a command
     -e, --execute    Execute the generated command immediately
     -c, --copy       Copy the command to clipboard and exit
     -u, --url        Override the API URL
@@ -29,6 +30,7 @@ Alias Recommendation (add to .bashrc or .zshrc):
 
 import sys
 import os
+import re
 import json
 import urllib.request
 import urllib.error
@@ -45,8 +47,27 @@ MODEL = os.getenv("AI_BASH_MODEL", "gpt-4o-mini")
 YELLOW = "\033[1;33m"
 BLUE = "\033[1;34m"
 RED = "\033[1;31m"
+CYAN = "\033[0;36m"
+GREEN = "\033[0;32m"
 RESET = "\033[0m"
 BOLD = "\033[1m"
+
+
+def format_markdown(text: str) -> str:
+    """Applies basic ANSI color formatting to markdown text."""
+    # Code blocks
+    text = re.sub(r'```[^\n]*\n(.*?)```', lambda m: CYAN + m.group(1).strip() + RESET, text, flags=re.DOTALL)
+    # Inline code
+    text = re.sub(r'`([^`]+)`', CYAN + r'\1' + RESET, text)
+    # Bold
+    text = re.sub(r'\*\*(.*?)\*\*', BOLD + r'\1' + RESET, text)
+    # Headers
+    text = re.sub(r'^(#{1,6})\s*(.*)', lambda m: BOLD + BLUE + m.group(2) + RESET, text, flags=re.MULTILINE)
+    
+    # Minimize excessive repetitive newlines
+    text = re.sub(r'\n{3,}', '\n\n', text)
+    
+    return text
 
 
 def get_system_context():
@@ -62,18 +83,29 @@ def get_system_context():
         return "OS: macOS/Linux"
 
 
-def ask_ai(question: str, provider: str) -> str:
-    """Queries the AI for a terminal command."""
+def ask_ai(question: str, provider: str, ask_mode: bool = False) -> str:
+    """Queries the AI for a terminal command or explanation."""
     ctx = get_system_context()
-    system_prompt = (
-        "You are a terminal command assistant. The user describes a task, and you provide the exact shell command. "
-        f"Context: {ctx}. "
-        "Rules:\n"
-        "1. Reply ONLY with the raw command on a single line.\n"
-        "2. No markdown, no backticks, no markdown blocks, no explanations.\n"
-        "3. Ensure the command is compatible with the provided OS and shell.\n"
-        "4. If multiple commands are needed, join them with && or |."
-    )
+
+    if ask_mode:
+        system_prompt = (
+            "You are a helpful terminal assistant. The user asks how to do something or for an explanation. "
+            f"Context: {ctx}. "
+            "Rules:\n"
+            "1. Provide a brief, concise explanation.\n"
+            "2. Include markdown formatting for commands if needed.\n"
+            "3. Keep it short and to the point."
+        )
+    else:
+        system_prompt = (
+            "You are a terminal command assistant. The user describes a task, and you provide the exact shell command. "
+            f"Context: {ctx}. "
+            "Rules:\n"
+            "1. Reply ONLY with the raw command on a single line.\n"
+            "2. No markdown, no backticks, no markdown blocks, no explanations.\n"
+            "3. Ensure the command is compatible with the provided OS and shell.\n"
+            "4. If multiple commands are needed, join them with && or |."
+        )
 
     if provider == "anthropic":
         anthropic_key = os.getenv("ANTHROPIC_API_KEY", "")
@@ -161,6 +193,9 @@ def ask_ai(question: str, provider: str) -> str:
             else:
                 content = res_data["choices"][0]["message"]["content"].strip()
 
+            if ask_mode:
+                return content.strip()
+
             # Post-processing to remove any unwanted formatting
             if "```" in content:
                 content = (
@@ -216,6 +251,12 @@ def main():
     )
     parser.add_argument("query", nargs="*", help="Description of the task to perform")
     parser.add_argument(
+        "-a",
+        "--ask",
+        action="store_true",
+        help="Ask for an explanation instead of a command",
+    )
+    parser.add_argument(
         "-e", "--execute", action="store_true", help="Execute the command immediately"
     )
     parser.add_argument(
@@ -251,12 +292,18 @@ def main():
     query = " ".join(args.query)
 
     print(f"{BLUE}🔍 Thinking...{RESET}", end="\r")
-    cmd = ask_ai(query, args.provider)
-    print(" " * 20, end="\r")  # Clear "Thinking..." line
+    cmd = ask_ai(query, args.provider, args.ask)
+    sys.stdout.write("\033[2K\r")  # Clear "Thinking..." line completely
+    sys.stdout.flush()
 
     if not cmd:
-        print(f"{RED}No command generated.{RESET}")
+        print(f"{RED}No response generated.{RESET}")
         sys.exit(1)
+
+    if args.ask:
+        formatted_cmd = format_markdown(cmd)
+        print(f"{formatted_cmd}\n")
+        sys.exit(0)
 
     print(f"\n  {YELLOW}➜  {BOLD}{cmd}{RESET}\n")
 
