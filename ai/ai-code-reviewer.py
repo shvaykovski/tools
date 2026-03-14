@@ -31,7 +31,7 @@ import subprocess
 import sys
 import argparse
 from ai_core.colors import RED, GREEN, BLUE, RESET, BOLD
-from ai_core.utils import read_files
+from ai_core.utils import read_files, clean_markdown
 from ai_core.ai_client import call_ai
 from ai_core.config import DEFAULT_PROVIDER, get_default_model
 
@@ -60,6 +60,7 @@ If there are issues, security vulnerabilities, or bugs, respond with 'REJECT' on
 """
     messages = [{"role": "user", "content": prompt}]
     response_text = call_ai(messages, provider, model, temperature=0.1)
+    response_text = clean_markdown(response_text) if response_text else ""
 
     if not response_text:
         print(f"{RED}⚠️ AI review failed. Skipping.{RESET}")

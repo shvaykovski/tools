@@ -42,6 +42,21 @@ def copy_to_clipboard(text: str):
     except Exception:
         pass
 
+def clean_markdown(text: str) -> str:
+    """Removes markdown code block wrappers from the text."""
+    text = text.strip()
+    if text.startswith("```"):
+        lines = text.splitlines()
+        # Remove the first line (the opening ```lang)
+        if len(lines) > 0 and lines[0].startswith("```"):
+            lines = lines[1:]
+        # Remove the last line (the closing ```)
+        if len(lines) > 0 and lines[-1].strip() == "```":
+            lines = lines[:-1]
+        text = "\n".join(lines).strip()
+    return text
+
+
 def save_to_file(content, prefix="output", default_filename=None):
     """Handles saving content to a timestamped file."""
     if not default_filename:

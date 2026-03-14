@@ -40,7 +40,7 @@ import trafilatura
 
 from ai_core.colors import YELLOW, BLUE, RED, CYAN, GREEN, RESET, BOLD
 from ai_core.ai_client import call_ai
-from ai_core.utils import save_to_file
+from ai_core.utils import save_to_file, clean_markdown
 from ai_core.config import SEARXNG_URL, DEFAULT_PROVIDER, get_default_model
 
 
@@ -65,6 +65,7 @@ class ResearchAgent:
         ]
 
         raw_response = call_ai(messages, self.provider, self.model)
+        raw_response = clean_markdown(raw_response) if raw_response else ""
         queries = [q.strip("- ").strip() for q in raw_response.split("\n") if q.strip()]
 
         if not queries:
@@ -124,6 +125,7 @@ class ResearchAgent:
         ]
 
         raw_ids = call_ai(messages, self.provider, self.model)
+        raw_ids = clean_markdown(raw_ids) if raw_ids else ""
         ids = re.findall(r"\d+", raw_ids)
 
         found_urls = []
@@ -170,7 +172,8 @@ class ResearchAgent:
             {"role": "user", "content": research_context},
         ]
 
-        return call_ai(messages, self.provider, self.model)
+        report = call_ai(messages, self.provider, self.model)
+        return clean_markdown(report) if report else ""
 
 
 def main():

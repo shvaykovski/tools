@@ -33,7 +33,7 @@ import sys
 import subprocess
 import argparse
 from ai_core.colors import YELLOW, BLUE, RED, RESET, BOLD, format_markdown
-from ai_core.utils import get_system_context, copy_to_clipboard
+from ai_core.utils import get_system_context, copy_to_clipboard, clean_markdown
 from ai_core.ai_client import call_ai
 from ai_core.config import DEFAULT_PROVIDER, get_default_model
 
@@ -60,8 +60,9 @@ def ask_ai_helper(
             "Rules:\n"
             "1. Reply ONLY with the raw command on a single line.\n"
             "2. No markdown, no backticks, no markdown blocks, no explanations.\n"
-            "3. Ensure the command is compatible with the provided OS and shell.\n"
-            "4. If multiple commands are needed, join them with && or |."
+            "3. IMPORTANT: DO NOT wrap the command in triple backticks or any markdown. Just the raw text.\n"
+            "4. Ensure the command is compatible with the provided OS and shell.\n"
+            "5. If multiple commands are needed, join them with && or |."
         )
 
     messages = [
@@ -78,15 +79,10 @@ def ask_ai_helper(
         return ""
 
     if ask_mode:
-        return content
+        return clean_markdown(content)
 
     # Post-processing for command mode
-    if "```" in content:
-        content = (
-            content.split("```")[-2].split("\n", 1)[-1]
-            if content.count("```") >= 2
-            else content
-        )
+    content = clean_markdown(content)
     return content.strip("`").strip()
 
 

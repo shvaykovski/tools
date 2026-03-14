@@ -29,7 +29,7 @@ Flags:
 import sys
 import argparse
 from ai_core.colors import YELLOW, BLUE, RED, CYAN, GREEN, RESET, BOLD
-from ai_core.utils import get_system_context, read_files, save_to_file
+from ai_core.utils import get_system_context, read_files, save_to_file, clean_markdown
 from ai_core.ai_client import call_ai
 from ai_core.config import DEFAULT_PROVIDER, get_default_model
 
@@ -64,7 +64,8 @@ def main():
         "2. If you need more information, ask your questions first. Start these responses with 'QUESTION:'.\n"
         "3. Once (and ONLY once) you have all necessary info, provide the full final plan. Start this response with 'PLAN:'.\n"
         "4. Any plan must begin with a '# Implementation Plan: [Goal Name]' title.\n"
-        "5. Keep responses focused: EITHER ask questions OR provide the plan. Never both in one response."
+        "5. IMPORTANT: Your entire response should be plain Markdown. DO NOT wrap the plan itself or your entire response in triple backticks (markdown code blocks).\n"
+        "6. Keep responses focused: EITHER ask questions OR provide the plan. Never both in one response."
     )
 
     messages = [
@@ -88,15 +89,18 @@ def main():
             print(f"{RED}No response generated.{RESET}")
             break
 
+        response = clean_markdown(response)
         clean_response = response.strip()
-        
-        # Check for QUESTION
-        if clean_response.upper().startswith("QUESTION:") or "QUESTION:" in clean_response.split('\n')[-1].upper():
+
+        if (
+            clean_response.upper().startswith("QUESTION:")
+            or "QUESTION:" in clean_response.split("\n")[-1].upper()
+        ):
             # If it's a long response but the last line is a question, or it starts with it
             display_text = clean_response
             if clean_response.upper().startswith("QUESTION:"):
                 display_text = clean_response[9:].strip()
-            
+
             print(f"\n{YELLOW}🤔 Question:{RESET} {display_text}")
             try:
                 ans = input(f"\n{BOLD}Answer ('exit' to quit): {RESET}").strip()
@@ -104,20 +108,21 @@ def main():
                     break
                 messages.append({"role": "assistant", "content": response})
                 messages.append({"role": "user", "content": ans})
-                continue # Go back to Thinking...
+                continue  # Go back to Thinking...
             except KeyboardInterrupt:
                 break
-        
-        # Check for PLAN
+
         if clean_response.upper().startswith("PLAN:"):
             final_plan = clean_response[5:].strip()
+            # Clean again in case the content under PLAN: was wrapped
+            final_plan = clean_markdown(final_plan)
             print(f"\n{GREEN}✅ Final Plan Generated:{RESET}\n\n{final_plan}\n")
             save_to_file(final_plan, prefix="plan")
             break
-            
-        # Default behavior: treat as final plan but print as is
-        print(f"\n{response}\n")
-        save_to_file(response, prefix="plan")
+
+        final_plan = clean_markdown(clean_response)
+        print(f"\n{final_plan}\n")
+        save_to_file(final_plan, prefix="plan")
         break
 
 
