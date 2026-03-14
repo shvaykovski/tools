@@ -23,6 +23,7 @@ PROVIDER_MODELS = {
     "openrouter": os.getenv("OPENROUTER_MODEL", "google/gemini-flash-1.5"),
 }
 
+
 def get_default_model(provider):
     """Returns the default model for a given provider."""
     return PROVIDER_MODELS.get(provider, PROVIDER_MODELS["ollama"])

@@ -4,15 +4,21 @@ import subprocess
 from datetime import datetime
 from .colors import BLUE, YELLOW, GREEN, RED, RESET, BOLD
 
+
 def get_system_context():
     """Gathers OS, Shell, and CWD info."""
     try:
         os_name = platform.system()
-        os_version = platform.mac_ver()[0] if os_name == "Darwin" else platform.release()
+        os_version = (
+            platform.mac_ver()[0] if os_name == "Darwin" else platform.release()
+        )
         shell = os.path.basename(os.getenv("SHELL", "bash"))
-        return f"OS: {os_name} (version {os_version}), Shell: {shell}, CWD: {os.getcwd()}"
+        return (
+            f"OS: {os_name} (version {os_version}), Shell: {shell}, CWD: {os.getcwd()}"
+        )
     except Exception:
         return "Standard macOS/Linux environment"
+
 
 def read_files(file_paths):
     """Reads content of specified files to provide as context."""
@@ -29,6 +35,7 @@ def read_files(file_paths):
                 print(f"{RED}Error reading {path}: {e}{RESET}")
     return context
 
+
 def copy_to_clipboard(text: str):
     """Copies text to the clipboard using pbcopy (macOS) or xclip/xsel (Linux)."""
     try:
@@ -36,11 +43,18 @@ def copy_to_clipboard(text: str):
             subprocess.run(["pbcopy"], input=text.encode(), check=True)
         else:
             try:
-                subprocess.run(["xclip", "-selection", "clipboard"], input=text.encode(), check=True)
+                subprocess.run(
+                    ["xclip", "-selection", "clipboard"],
+                    input=text.encode(),
+                    check=True,
+                )
             except (FileNotFoundError, subprocess.CalledProcessError):
-                subprocess.run(["xsel", "--clipboard", "--input"], input=text.encode(), check=True)
+                subprocess.run(
+                    ["xsel", "--clipboard", "--input"], input=text.encode(), check=True
+                )
     except Exception:
         pass
+
 
 def clean_markdown(text: str) -> str:
     """Removes markdown code block wrappers from the text."""
@@ -67,7 +81,9 @@ def save_to_file(content, prefix="output", default_filename=None):
     choice = input(f" [{BOLD}y{RESET}]es / [{BOLD}n{RESET}]o: ").strip().lower()
 
     if choice == "y":
-        filename = input(f" Enter filename (default: {YELLOW}{default_filename}{RESET}): ").strip()
+        filename = input(
+            f" Enter filename (default: {YELLOW}{default_filename}{RESET}): "
+        ).strip()
         if not filename:
             filename = default_filename
 

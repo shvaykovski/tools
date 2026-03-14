@@ -97,7 +97,9 @@ if __name__ == "__main__":
         sys.exit(0)
 
     review_type = "specified files" if args.files else "staged changes"
-    print(f"{BLUE}🤖 Running AI Code Review on {review_type} using {BOLD}{active_model}{RESET} ({active_provider})...{RESET}")
+    print(
+        f"{BLUE}🤖 Running AI Code Review on {review_type} using {BOLD}{active_model}{RESET} ({active_provider})...{RESET}"
+    )
 
     passed = review_code(content, active_provider, active_model, is_diff=is_diff)
     if not passed:

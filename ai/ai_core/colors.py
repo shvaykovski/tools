@@ -9,6 +9,7 @@ GREEN = "\033[0;32m"
 RESET = "\033[0m"
 BOLD = "\033[1m"
 
+
 def format_markdown(text: str) -> str:
     """Applies basic ANSI color formatting to markdown text."""
     # Code blocks
