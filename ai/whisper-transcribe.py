@@ -2,22 +2,25 @@
 
 """
 Whisper Transcription Tool (CLI Wrapper)
-This script wraps the globally installed 'whisper' command to ensure compatibility
-across different Python environments.
+Wraps the globally installed 'whisper' command to ensure compatibility and ease of use.
 
-Usage:
-    ./whisper-transcribe.py <audio_or_video_file> [options]
+Prerequisites:
+    - Python 3.x
+    - 'whisper' command-line tool (pip install -U openai-whisper)
+    - FFmpeg (required by whisper for audio processing)
 
-Examples:
-    ./whisper-transcribe.py meeting.mp3 --model base --lang en
-    ./whisper-transcribe.py interview.mp4 --model large-v3 --prompt "Interview with a scientist"
+Usage (Direct Call):
+    python3 whisper-transcribe.py meeting.mp3
+    python3 whisper-transcribe.py interview.mp4 --model large-v3 --lang en
+    python3 whisper-transcribe.py lesson.wav --prompt "Advanced physics lecture"
+    python3 whisper-transcribe.py data.m4a --device mps --temperature 0.2
 
 Options:
     --model        Whisper model size: tiny, base, small, medium, large, large-v3 (default: small)
     --lang         ISO language code (default: en)
     --temperature  Sampling temperature (0-1, default: 0)
     --prompt       Initial text to guide the model (context, names, terms)
-    --device       Device to use (e.g., cuda, cpu, mps)
+    --device       Hardware device to use (e.g., cuda, cpu, mps)
 """
 
 import argparse
