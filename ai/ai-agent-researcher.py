@@ -22,11 +22,13 @@ Usage (Direct Call):
     python3 ai-agent-researcher.py --limit 5 --store "Best practices for LLM agents"
     python3 ai-agent-researcher.py --queries 5 "Impact of AI on software engineering"
     python3 ai-agent-researcher.py --provider anthropic "History of the internet"
+    python3 ai-agent-researcher.py --json "Benefits of exercise"
 
 Flags:
     --limit          Number of top URLs to scrape and analyze (default: 5)
     --queries        Number of search queries to generate for breadth (default: 3)
     --store          Save the final research report to a timestamped markdown file
+    -j, --json       Output result in structured JSON format
     -p, --provider   AI provider (openai, anthropic, openrouter, or ollama)
     -m, --model      Override the default model name for the provider
 """
@@ -37,6 +39,7 @@ import urllib.parse
 import argparse
 import re
 import trafilatura
+import sys
 
 from ai_core.colors import YELLOW, BLUE, RED, CYAN, GREEN, RESET, BOLD
 from ai_core.ai_client import call_ai
@@ -45,16 +48,31 @@ from ai_core.config import SEARXNG_URL, DEFAULT_PROVIDER, get_default_model
 
 
 class ResearchAgent:
-    def __init__(self, provider=DEFAULT_PROVIDER, model=None, limit=5, query_count=3):
+    def __init__(
+        self,
+        provider=DEFAULT_PROVIDER,
+        model=None,
+        limit=5,
+        query_count=3,
+        json_mode=False,
+    ):
         self.provider = provider
         self.model = model or get_default_model(provider)
         self.limit = limit
         self.query_count = query_count
         self.searxng_url = SEARXNG_URL
+        self.json_mode = json_mode
+
+    def log(self, message):
+        """Prints message to stderr if json_mode is active, otherwise stdout."""
+        if self.json_mode:
+            print(message, file=sys.stderr)
+        else:
+            print(message)
 
     def generate_queries(self, topic):
         """Pass 1: Use AI to generate diverse search queries."""
-        print(
+        self.log(
             f"{BLUE}🔍 Generating {self.query_count} optimized search queries using {BOLD}{self.model}{RESET}...{RESET}"
         )
 
@@ -71,9 +89,9 @@ class ResearchAgent:
         if not queries:
             queries = [topic]
 
-        print(f"   Queries:")
+        self.log(f"   Queries:")
         for q in queries[: self.query_count]:
-            print(f"     - {YELLOW}{q}{RESET}")
+            self.log(f"     - {YELLOW}{q}{RESET}")
 
         return queries[: self.query_count]
 
@@ -86,17 +104,17 @@ class ResearchAgent:
                 data = json.loads(response.read())
                 return data.get("results", [])
         except Exception as e:
-            print(f"{RED}Search Error for '{query}': {e}{RESET}")
+            self.log(f"{RED}Search Error for '{query}': {e}{RESET}")
             return []
 
     def perform_search(self, queries):
         """Pass 2: Execute search queries and deduplicate results."""
-        print(f"{BLUE}🌐 Searching via SearXNG...{RESET}")
+        self.log(f"{BLUE}🌐 Searching via SearXNG...{RESET}")
         all_results = []
         seen_urls = set()
 
         for query in queries:
-            print(f"   Query: {CYAN}{query}{RESET}")
+            self.log(f"   Query: {CYAN}{query}{RESET}")
             results = self._search_searxng(query)
             for r in results:
                 url = r.get("url")
@@ -110,7 +128,7 @@ class ResearchAgent:
         if not results:
             return []
 
-        print(f"{BLUE}🎯 Selecting top {self.limit} results...{RESET}")
+        self.log(f"{BLUE}🎯 Selecting top {self.limit} results...{RESET}")
         snippets = "\n".join(
             [
                 f"ID:{i} | {r.get('title')} | {r.get('content')[:150]}"
@@ -141,11 +159,11 @@ class ResearchAgent:
 
     def scrape_content(self, urls):
         """Pass 4: Scrape URLs and convert to markdown."""
-        print(f"{BLUE}📄 Scraping content...{RESET}")
+        self.log(f"{BLUE}📄 Scraping content...{RESET}")
         collected_data = []
 
         for url in urls:
-            print(f"   Fetching: {CYAN}{url}{RESET}")
+            self.log(f"   Fetching: {CYAN}{url}{RESET}")
             try:
                 downloaded = trafilatura.fetch_url(url, no_ssl=True)
                 if downloaded:
@@ -154,7 +172,7 @@ class ResearchAgent:
                         # Limit content per source to stay within context limits
                         collected_data.append(f"SOURCE: {url}\n{text[:8000]}")
             except Exception as e:
-                print(f"   {RED}Error on {url}: {e}{RESET}")
+                self.log(f"   {RED}Error on {url}: {e}{RESET}")
         return collected_data
 
     def generate_report(self, topic, content):
@@ -162,9 +180,15 @@ class ResearchAgent:
         if not content:
             return ""
 
-        print(f"{BLUE}📝 Generating research report...{RESET}")
+        self.log(f"{BLUE}📝 Generating research report...{RESET}")
 
-        system_prompt = "Summarize the research comprehensively. Cite source URLs for every key fact. Use Markdown."
+        system_prompt = (
+            "Summarize the research comprehensively, focusing EXCLUSIVELY on information relevant to the topic. "
+            "Exclude any fluff, unrelated content, or generic website boilerplate. "
+            "Cite source URLs for every key fact. Use Markdown."
+        )
+        if self.json_mode:
+            system_prompt += " IMPORTANT: Do NOT include a 'Sources', 'References', or bibliography section at the end of your response."
         research_context = f"Topic: {topic}\n\nContent:\n" + "\n\n".join(content)
 
         messages = [
@@ -184,6 +208,9 @@ def main():
         "--queries", type=int, default=3, help="Search queries to generate"
     )
     parser.add_argument("--store", action="store_true")
+    parser.add_argument(
+        "-j", "--json", action="store_true", help="Output result in JSON format"
+    )
     parser.add_argument("-p", "--provider", default=DEFAULT_PROVIDER)
     parser.add_argument("-m", "--model", help="Override AI Model")
     args = parser.parse_args()
@@ -195,13 +222,14 @@ def main():
         model=args.model,
         limit=args.limit,
         query_count=args.queries,
+        json_mode=args.json,
     )
 
     queries = agent.generate_queries(topic)
     all_results = agent.perform_search(queries)
 
     if not all_results:
-        print(f"{RED}No results found or failed to reach SearXNG.{RESET}")
+        agent.log(f"{RED}No results found or failed to reach SearXNG.{RESET}")
         return
 
     top_urls = agent.filter_results(topic, all_results)
@@ -209,11 +237,20 @@ def main():
     report = agent.generate_report(topic, scraped_content)
 
     if report:
-        print(f"\n{GREEN}{BOLD}FINAL REPORT:{RESET}\n\n{report}\n")
+        if args.json:
+            result_json = {"result": report, "sources": top_urls}
+            print(json.dumps(result_json, indent=4))
+        else:
+            print(f"\n{GREEN}{BOLD}FINAL REPORT:{RESET}\n\n{report}\n")
+
         if args.store:
-            save_to_file(report, prefix="research")
+            if args.json:
+                save_content = json.dumps(result_json, indent=4)
+                save_to_file(save_content, prefix="research", extension="json")
+            else:
+                save_to_file(report, prefix="research")
     else:
-        print(f"{RED}Failed to generate report.{RESET}")
+        agent.log(f"{RED}Failed to generate report.{RESET}")
 
 
 if __name__ == "__main__":

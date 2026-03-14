@@ -71,11 +71,11 @@ def clean_markdown(text: str) -> str:
     return text
 
 
-def save_to_file(content, prefix="output", default_filename=None):
+def save_to_file(content, prefix="output", default_filename=None, extension="md"):
     """Handles saving content to a timestamped file."""
     if not default_filename:
         timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-        default_filename = f"{prefix}-{timestamp}.md"
+        default_filename = f"{prefix}-{timestamp}.{extension}"
 
     print(f"\n{BLUE}💾 Would you like to save this to a file?{RESET}")
     choice = input(f" [{BOLD}y{RESET}]es / [{BOLD}n{RESET}]o: ").strip().lower()
