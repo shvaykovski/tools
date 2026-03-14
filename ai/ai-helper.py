@@ -56,17 +56,27 @@ BOLD = "\033[1m"
 def format_markdown(text: str) -> str:
     """Applies basic ANSI color formatting to markdown text."""
     # Code blocks
-    text = re.sub(r'```[^\n]*\n(.*?)```', lambda m: CYAN + m.group(1).strip() + RESET, text, flags=re.DOTALL)
+    text = re.sub(
+        r"```[^\n]*\n(.*?)```",
+        lambda m: CYAN + m.group(1).strip() + RESET,
+        text,
+        flags=re.DOTALL,
+    )
     # Inline code
-    text = re.sub(r'`([^`]+)`', CYAN + r'\1' + RESET, text)
+    text = re.sub(r"`([^`]+)`", CYAN + r"\1" + RESET, text)
     # Bold
-    text = re.sub(r'\*\*(.*?)\*\*', BOLD + r'\1' + RESET, text)
+    text = re.sub(r"\*\*(.*?)\*\*", BOLD + r"\1" + RESET, text)
     # Headers
-    text = re.sub(r'^(#{1,6})\s*(.*)', lambda m: BOLD + BLUE + m.group(2) + RESET, text, flags=re.MULTILINE)
-    
+    text = re.sub(
+        r"^(#{1,6})\s*(.*)",
+        lambda m: BOLD + BLUE + m.group(2) + RESET,
+        text,
+        flags=re.MULTILINE,
+    )
+
     # Minimize excessive repetitive newlines
-    text = re.sub(r'\n{3,}', '\n\n', text)
-    
+    text = re.sub(r"\n{3,}", "\n\n", text)
+
     return text
 
 
