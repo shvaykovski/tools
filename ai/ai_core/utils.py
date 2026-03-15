@@ -20,19 +20,36 @@ def get_system_context():
         return "Standard macOS/Linux environment"
 
 
-def read_files(file_paths):
-    """Reads content of specified files to provide as context."""
+def read_file_smart(path, max_chars=15000):
+    """Reads file with head & tail truncation for large files."""
+    if not os.path.isfile(path):
+        return ""
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            content = f.read()
+            if len(content) <= max_chars:
+                return content
+
+            # Head 40%, Tail 40%, Truncation message in middle
+            head_size = int(max_chars * 0.4)
+            tail_size = int(max_chars * 0.4)
+            head = content[:head_size]
+            tail = content[-tail_size:]
+            return f"{head}\n\n... [TRUNCATED {len(content) - max_chars} characters] ...\n\n{tail}"
+    except Exception as e:
+        print(f"{RED}Error reading {path}: {e}{RESET}")
+        return ""
+
+
+def read_files_context(file_paths):
+    """Reads multiple files using the smart reader."""
     if not file_paths:
         return ""
     context = ""
     for path in file_paths:
-        if os.path.isfile(path):
-            try:
-                with open(path, "r", encoding="utf-8") as f:
-                    content = f.read()
-                    context += f"\n--- FILE: {path} ---\n{content}\n"
-            except Exception as e:
-                print(f"{RED}Error reading {path}: {e}{RESET}")
+        content = read_file_smart(path)
+        if content:
+            context += f"\n--- FILE: {path} ---\n{content}\n"
     return context
 
 
@@ -72,26 +89,24 @@ def clean_markdown(text: str) -> str:
 
 
 def save_to_file(content, prefix="output", default_filename=None, extension="md"):
-    """Handles saving content to a timestamped file."""
+    """Handles saving content to a file with a filename prompt."""
     if not default_filename:
         timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
         default_filename = f"{prefix}-{timestamp}.{extension}"
 
-    print(f"\n{BLUE}💾 Would you like to save this to a file?{RESET}")
-    choice = input(f" [{BOLD}y{RESET}]es / [{BOLD}n{RESET}]o: ").strip().lower()
+    print(f"\n{BLUE}💾 Saving to file...{RESET}")
+    filename = input(
+        f" Enter filename (default: {YELLOW}{default_filename}{RESET}): "
+    ).strip()
 
-    if choice == "y":
-        filename = input(
-            f" Enter filename (default: {YELLOW}{default_filename}{RESET}): "
-        ).strip()
-        if not filename:
-            filename = default_filename
+    if not filename:
+        filename = default_filename
 
-        try:
-            with open(filename, "w", encoding="utf-8") as f:
-                f.write(content)
-            print(f"{GREEN}✨ Successfully saved to: {BOLD}{filename}{RESET}")
-            return filename
-        except Exception as e:
-            print(f"{RED}Error saving file: {e}{RESET}")
+    try:
+        with open(filename, "w", encoding="utf-8") as f:
+            f.write(content)
+        print(f"{GREEN}✨ Successfully saved to: {BOLD}{filename}{RESET}")
+        return filename
+    except Exception as e:
+        print(f"{RED}Error saving file: {e}{RESET}")
     return None

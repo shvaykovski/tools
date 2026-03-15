@@ -29,7 +29,12 @@ Flags:
 import sys
 import argparse
 from ai_core.colors import YELLOW, BLUE, RED, CYAN, GREEN, RESET, BOLD
-from ai_core.utils import get_system_context, read_files, save_to_file, clean_markdown
+from ai_core.utils import (
+    get_system_context,
+    read_files_context,
+    save_to_file,
+    clean_markdown,
+)
 from ai_core.ai_client import call_ai
 from ai_core.config import DEFAULT_PROVIDER, get_default_model
 
@@ -54,25 +59,28 @@ def main():
     active_model = args.model or get_default_model(args.provider)
 
     goal_text = " ".join(args.goal)
-    file_context = read_files(args.files) if args.files else ""
+    file_context = read_files_context(args.files) if args.files else ""
 
     system_prompt = (
         "You are an AI Agent Planner. Your goal is to generate a comprehensive technical implementation plan in Markdown. "
-        f"Context: {get_system_context()}. "
+        f"Environment: {get_system_context()}. "
         "Rules:\n"
         "1. DO NOT provide any part of the plan if you still have questions or need clarification.\n"
         "2. If you need more information, ask your questions first. Start these responses with 'QUESTION:'.\n"
-        "3. Once (and ONLY once) you have all necessary info, provide the full final plan. Start this response with 'PLAN:'.\n"
+        "3. Once you are ready, provide the plan. Start this response with 'PLAN:'.\n"
         "4. Any plan must begin with a '# Implementation Plan: [Goal Name]' title.\n"
-        "5. IMPORTANT: Your entire response should be plain Markdown. DO NOT wrap the plan itself or your entire response in triple backticks (markdown code blocks).\n"
-        "6. Keep responses focused: EITHER ask questions OR provide the plan. Never both in one response."
+        "5. Your entire response should be plain Markdown. DO NOT wrap the response in triple backticks.\n"
+        "6. Strategy Selection:\n"
+        "   - Documentation Mode: If context is primarily requirements/docs, act as a Solutions Architect. Focus on high-level architecture and data flows.\n"
+        "   - Code Mode: If context is source code, act as a Senior Developer. Focus on implementation details and refactoring.\n"
+        "7. Iterative Logic: If feedback is provided, acknowledge change requests and update relevant sections while maintaining integrity.\n"
     )
 
     messages = [
         {"role": "system", "content": system_prompt},
         {
             "role": "user",
-            "content": f"Goal: {goal_text}\n\nFiles Context:\n{file_context}",
+            "content": f"Goal: {goal_text}\n\nContext:\n{file_context}",
         },
     ]
 
@@ -92,15 +100,9 @@ def main():
         response = clean_markdown(response)
         clean_response = response.strip()
 
-        if (
-            clean_response.upper().startswith("QUESTION:")
-            or "QUESTION:" in clean_response.split("\n")[-1].upper()
-        ):
-            # If it's a long response but the last line is a question, or it starts with it
-            display_text = clean_response
-            if clean_response.upper().startswith("QUESTION:"):
-                display_text = clean_response[9:].strip()
-
+        # Handle Questions
+        if clean_response.upper().startswith("QUESTION:"):
+            display_text = clean_response[9:].strip()
             print(f"\n{YELLOW}🤔 Question:{RESET} {display_text}")
             try:
                 ans = input(f"\n{BOLD}Answer ('exit' to quit): {RESET}").strip()
@@ -108,22 +110,66 @@ def main():
                     break
                 messages.append({"role": "assistant", "content": response})
                 messages.append({"role": "user", "content": ans})
-                continue  # Go back to Thinking...
+                continue
             except KeyboardInterrupt:
                 break
 
-        if clean_response.upper().startswith("PLAN:"):
-            final_plan = clean_response[5:].strip()
-            # Clean again in case the content under PLAN: was wrapped
-            final_plan = clean_markdown(final_plan)
-            print(f"\n{GREEN}✅ Final Plan Generated:{RESET}\n\n{final_plan}\n")
-            save_to_file(final_plan, prefix="plan")
-            break
+        # Handle Plan
+        if "PLAN:" in clean_response.upper():
+            # Find the start of the plan (case insensitive)
+            plan_marker = "PLAN:"
+            idx = clean_response.upper().find(plan_marker)
+            final_plan = clean_markdown(
+                clean_response[idx + len(plan_marker) :].strip()
+            )
 
+            print(f"\n{GREEN}✅ Proposed Plan:{RESET}\n\n{final_plan}\n")
+
+            print(
+                f"{CYAN}🔄 [{BOLD}f{RESET}]eedback to improve, [{BOLD}s{RESET}]ave and exit, or [{BOLD}q{RESET}]uit?{RESET}"
+            )
+            choice = input("> ").lower().strip()
+
+            if choice == "s":
+                save_to_file(final_plan, prefix="plan")
+                break
+            elif choice == "f":
+                feedback = input(f"{BOLD}What should be changed? {RESET}").strip()
+                messages.append({"role": "assistant", "content": response})
+                messages.append(
+                    {
+                        "role": "user",
+                        "content": f"Improve the plan with this feedback: {feedback}",
+                    }
+                )
+                continue
+            else:
+                break
+
+        # Fallback for responses that don't follow markers
         final_plan = clean_markdown(clean_response)
         print(f"\n{final_plan}\n")
-        save_to_file(final_plan, prefix="plan")
-        break
+
+        print(
+            f"{CYAN}🔄 [{BOLD}f{RESET}]eedback to improve, [{BOLD}s{RESET}]ave and exit, or [{BOLD}q{RESET}]uit?{RESET}"
+        )
+        choice = input("> ").lower().strip()
+
+        if choice == "s":
+            save_to_file(final_plan, prefix="plan")
+            break
+        elif choice == "f":
+            feedback = input(f"{BOLD}What should be changed? {RESET}").strip()
+            messages.append({"role": "assistant", "content": response})
+            messages.append(
+                {
+                    "role": "user",
+                    "content": f"Improve the plan with this feedback: {feedback}",
+                }
+            )
+            continue
+        else:
+            break
 
 
 if __name__ == "__main__":
