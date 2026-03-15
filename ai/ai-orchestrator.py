@@ -153,31 +153,115 @@ async def main():
     print(f"{BLUE}🧠 Phase 3: Launching Planner Agent...{RESET}")
     print(f"   Using: {BOLD}{p_provider}{RESET}" + (f" ({p_model})" if p_model else ""))
     tmp_file = os.path.join(base_dir, ".master_context.tmp")
+    req_file = os.path.join(base_dir, ".research_request.tmp")
+    research_iterations = 0
+    max_iterations = 3
+
     try:
-        with open(tmp_file, "w", encoding="utf-8") as f:
-            f.write(master_context)
+        while True:
+            with open(tmp_file, "w", encoding="utf-8") as f:
+                f.write(master_context)
 
-        planner_script = os.path.join(base_dir, "ai-agent-planner.py")
-        planner_cmd = [
-            sys.executable,
-            planner_script,
-            "Refer to the master context file for full mission details",
-            "-f",
-            tmp_file,
-            "-p",
-            p_provider,
-        ]
-        if p_model:
-            planner_cmd += ["-m", p_model]
+            planner_script = os.path.join(base_dir, "ai-agent-planner.py")
+            planner_cmd = [
+                sys.executable,
+                planner_script,
+                "Refer to the master context file for full mission details",
+                "-f",
+                tmp_file,
+                "-p",
+                p_provider,
+            ]
+            if p_model:
+                planner_cmd += ["-m", p_model]
 
-        # Use subprocess.run with check=True and inherit stdout/stderr for interactivity
-        subprocess.run(planner_cmd)
+            # Use subprocess.run with check=False to read the return code
+            proc = subprocess.run(planner_cmd)
+
+            if proc.returncode == 2:
+                # Planner requested additional research
+                if os.path.exists(req_file):
+                    with open(req_file, "r", encoding="utf-8") as rf:
+                        query = rf.read().strip()
+                    os.remove(req_file)
+
+                    if research_iterations < max_iterations:
+                        research_iterations += 1
+                        print(
+                            f"\n{BLUE}🔄 Orchestrator: Dynamic Research Triggered ({research_iterations}/{max_iterations}){RESET}"
+                        )
+                        print(f"   Query: {YELLOW}{query}{RESET}\n")
+
+                        # Run researcher
+                        research_script = os.path.join(
+                            base_dir, "ai-agent-researcher.py"
+                        )
+                        research_cmd = [
+                            sys.executable,
+                            research_script,
+                            query,
+                            "-p",
+                            r_provider,
+                            "--agentic",
+                        ]
+                        if r_model:
+                            research_cmd += ["-m", r_model]
+
+                        research_proc = subprocess.Popen(
+                            research_cmd,
+                            stdout=subprocess.PIPE,
+                            stderr=subprocess.STDOUT,
+                            text=True,
+                            bufsize=1,
+                            universal_newlines=True,
+                        )
+
+                        full_output = []
+                        is_reporting = False
+                        for line in research_proc.stdout:
+                            if "FINAL REPORT:" in line:
+                                is_reporting = True
+                            if not is_reporting:
+                                sys.stdout.write(line)
+                                sys.stdout.flush()
+                            full_output.append(line)
+
+                        research_proc.wait()
+                        combined_output = "".join(full_output)
+
+                        if "FINAL REPORT:" in combined_output:
+                            parts = combined_output.split("FINAL REPORT:")
+                            new_summary = parts[1].strip()
+                            master_context += f"\n\n### ADDITIONAL RESEARCH (ITERATION {research_iterations})\n{new_summary}\n"
+                            print(
+                                f"{GREEN}✅ Dynamic context updated. Reigniting Planner...{RESET}\n"
+                            )
+                        else:
+                            print(
+                                f"{YELLOW}⚠️  Dynamic research failed. Reigniting Planner...{RESET}\n"
+                            )
+                            master_context += f"\n\n### ADDITIONAL RESEARCH FAILED\nSearched for {query} but found nothing.\n"
+                        continue  # Loop back to planner
+                    else:
+                        print(
+                            f"\n{RED}🛑 Max research iterations ({max_iterations}) reached.{RESET}"
+                        )
+                        master_context += f"\n\n### SYSTEM LIMITATION\nWe have reached the maximum allowed automated research runs ({max_iterations}). Based on the information gathered so far, provide the best complete plan you can.\n"
+                        continue  # Loop back to planner with warning
+                else:
+                    print(f"{RED}❌ Expected research query file not found.{RESET}")
+                    break
+            else:
+                # Normal exit or quit
+                break
 
     except Exception as e:
         print(f"{RED}❌ Planning phase failed: {e}{RESET}")
     finally:
         if os.path.exists(tmp_file):
             os.remove(tmp_file)
+        if os.path.exists(req_file):
+            os.remove(req_file)
 
 
 if __name__ == "__main__":

@@ -66,14 +66,15 @@ def main():
         f"Environment: {get_system_context()}. "
         "Rules:\n"
         "1. DO NOT provide any part of the plan if you still have questions or need clarification.\n"
-        "2. If you need more information, ask your questions first. Start these responses with 'QUESTION:'.\n"
-        "3. Once you are ready, provide the plan. Start this response with 'PLAN:'.\n"
-        "4. Any plan must begin with a '# Implementation Plan: [Goal Name]' title.\n"
-        "5. Your entire response should be plain Markdown. DO NOT wrap the response in triple backticks.\n"
-        "6. Strategy Selection:\n"
+        "2. If you need more information from the user, block your response with 'QUESTION:'.\n"
+        "3. If you lack external context (e.g., API docs, recent events) and need web research, start your response exactly with 'RESEARCH: [your search query]'.\n"
+        "4. Once you are ready, provide the plan. Start this response exactly with 'PLAN:'.\n"
+        "5. Any plan must begin with a '# Implementation Plan: [Goal Name]' title.\n"
+        "6. Your entire response should be plain Markdown. DO NOT wrap the response in triple backticks.\n"
+        "7. Strategy Selection:\n"
         "   - Documentation Mode: If context is primarily requirements/docs, act as a Solutions Architect. Focus on high-level architecture and data flows.\n"
         "   - Code Mode: If context is source code, act as a Senior Developer. Focus on implementation details and refactoring.\n"
-        "7. Iterative Logic: If feedback is provided, acknowledge change requests and update relevant sections while maintaining integrity.\n"
+        "8. Iterative Logic: If feedback is provided, acknowledge change requests and update relevant sections while maintaining integrity.\n"
     )
 
     messages = [
@@ -113,6 +114,21 @@ def main():
                 continue
             except KeyboardInterrupt:
                 break
+
+        # Handle Research Request
+        if clean_response.upper().startswith("RESEARCH:"):
+            query = clean_response[9:].strip()
+            print(f"\n{YELLOW}🔎 Requesting additional research:{RESET} {query}")
+
+            # Write query to temp file for orchestrator
+            import os
+
+            base_dir = os.path.dirname(os.path.abspath(__file__))
+            req_file = os.path.join(base_dir, ".research_request.tmp")
+            with open(req_file, "w", encoding="utf-8") as rf:
+                rf.write(query)
+
+            sys.exit(2)  # Exit code 2 signals the orchestrator to run research
 
         # Handle Plan
         if "PLAN:" in clean_response.upper():
