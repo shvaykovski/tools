@@ -29,6 +29,7 @@ from ai_core.config import (
     PLANNER_PROVIDER,
     PLANNER_MODEL,
     get_default_model,
+    DEFAULT_THINKING_BUDGET,
 )
 
 
@@ -49,6 +50,13 @@ async def main():
         "-p", "--provider", default=DEFAULT_PROVIDER, help="Global AI Provider"
     )
     parser.add_argument("-m", "--model", help="Global AI Model override")
+    parser.add_argument(
+        "-t",
+        "--thinking",
+        type=int,
+        default=DEFAULT_THINKING_BUDGET,
+        help="Global thinking budget (tokens)",
+    )
 
     # Phase-specific overrides
     parser.add_argument("--rp", "--research-provider", help="Research phase provider")
@@ -101,6 +109,8 @@ async def main():
                 "-p",
                 r_provider,
                 "--agentic",
+                "-t",
+                str(args.thinking),
             ]
             if r_model:
                 research_cmd += ["-m", r_model]
@@ -184,6 +194,8 @@ async def main():
                 tmp_file,
                 "-p",
                 p_provider,
+                "-t",
+                str(args.thinking),
             ]
             if p_model:
                 planner_cmd += ["-m", p_model]
@@ -216,6 +228,8 @@ async def main():
                             "-p",
                             r_provider,
                             "--agentic",
+                            "-t",
+                            str(args.thinking),
                         ]
                         if r_model:
                             research_cmd += ["-m", r_model]

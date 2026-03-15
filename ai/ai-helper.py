@@ -27,6 +27,7 @@ Flags:
     -c, --copy       Copy the command to clipboard and exit
     -p, --provider   AI provider (openai, anthropic, openrouter, or ollama)
     -m, --model      Override the default model name for the provider
+    -t, --thinking   Thinking budget (integer tokens, e.g. 1024). Default 0.
 """
 
 import sys
@@ -35,11 +36,15 @@ import argparse
 from ai_core.colors import YELLOW, BLUE, RED, RESET, BOLD, format_markdown
 from ai_core.utils import get_system_context, copy_to_clipboard, clean_markdown
 from ai_core.ai_client import call_ai
-from ai_core.config import DEFAULT_PROVIDER, get_default_model
+from ai_core.config import DEFAULT_PROVIDER, get_default_model, DEFAULT_THINKING_BUDGET
 
 
 def ask_ai_helper(
-    question: str, provider: str, model_override: str = None, ask_mode: bool = False
+    question: str,
+    provider: str,
+    model_override: str = None,
+    ask_mode: bool = False,
+    thinking_budget: int = 0,
 ) -> str:
     """Queries the AI for a terminal command or explanation."""
     ctx = get_system_context()
@@ -73,7 +78,7 @@ def ask_ai_helper(
     # Resolve model
     active_model = model_override or get_default_model(provider)
 
-    content = call_ai(messages, provider, active_model)
+    content = call_ai(messages, provider, active_model, thinking_budget=thinking_budget)
 
     if not content:
         return ""
@@ -109,6 +114,13 @@ def main():
         default=DEFAULT_PROVIDER,
         help="AI provider",
     )
+    parser.add_argument(
+        "-t",
+        "--thinking",
+        type=int,
+        default=DEFAULT_THINKING_BUDGET,
+        help="Thinking budget (tokens)",
+    )
 
     if len(sys.argv) == 1:
         print(__doc__)
@@ -124,7 +136,8 @@ def main():
     query = " ".join(args.query)
 
     print(f"{BLUE}🔍 Thinking...{RESET}", end="\r")
-    cmd = ask_ai_helper(query, args.provider, args.model, args.ask)
+    cmd = ask_ai_helper(query, args.provider, args.model, args.ask, args.thinking)
+
     sys.stdout.write("\033[2K\r")
     sys.stdout.flush()
 

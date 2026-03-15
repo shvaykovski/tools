@@ -31,6 +31,7 @@ Flags:
     -j, --json       Output result in structured JSON format
     -p, --provider   AI provider (openai, anthropic, openrouter, or ollama)
     -m, --model      Override the default model name for the provider
+    -t, --thinking   Thinking budget (integer tokens). Default 0.
 """
 
 import json
@@ -44,7 +45,12 @@ import sys
 from ai_core.colors import YELLOW, BLUE, RED, CYAN, GREEN, RESET, BOLD
 from ai_core.ai_client import call_ai
 from ai_core.utils import save_to_file, clean_markdown
-from ai_core.config import SEARXNG_URL, DEFAULT_PROVIDER, get_default_model
+from ai_core.config import (
+    SEARXNG_URL,
+    DEFAULT_PROVIDER,
+    get_default_model,
+    DEFAULT_THINKING_BUDGET,
+)
 
 
 class ResearchAgent:
@@ -56,6 +62,7 @@ class ResearchAgent:
         query_count=3,
         json_mode=False,
         agentic_mode=False,
+        thinking_budget=0,
     ):
         self.provider = provider
         self.model = model or get_default_model(provider)
@@ -64,6 +71,7 @@ class ResearchAgent:
         self.searxng_url = SEARXNG_URL
         self.json_mode = json_mode
         self.agentic_mode = agentic_mode
+        self.thinking_budget = thinking_budget
 
     def log(self, message):
         """Prints message to stderr if json_mode is active, otherwise stdout."""
@@ -84,7 +92,12 @@ class ResearchAgent:
             {"role": "user", "content": topic},
         ]
 
-        raw_response = call_ai(messages, self.provider, self.model)
+        raw_response = call_ai(
+            messages,
+            self.provider,
+            self.model,
+            thinking_budget=self.thinking_budget,
+        )
         raw_response = clean_markdown(raw_response) if raw_response else ""
         queries = [q.strip("- ").strip() for q in raw_response.split("\n") if q.strip()]
 
@@ -144,7 +157,12 @@ class ResearchAgent:
             {"role": "user", "content": snippets},
         ]
 
-        raw_ids = call_ai(messages, self.provider, self.model)
+        raw_ids = call_ai(
+            messages,
+            self.provider,
+            self.model,
+            thinking_budget=self.thinking_budget,
+        )
         raw_ids = clean_markdown(raw_ids) if raw_ids else ""
         ids = re.findall(r"\d+", raw_ids)
 
@@ -198,7 +216,13 @@ class ResearchAgent:
             {"role": "user", "content": research_context},
         ]
 
-        report = call_ai(messages, self.provider, self.model, max_tokens=8192)
+        report = call_ai(
+            messages,
+            self.provider,
+            self.model,
+            max_tokens=8192,
+            thinking_budget=self.thinking_budget,
+        )
         return clean_markdown(report) if report else ""
 
 
@@ -218,6 +242,13 @@ def main():
     )
     parser.add_argument("-p", "--provider", default=DEFAULT_PROVIDER)
     parser.add_argument("-m", "--model", help="Override AI Model")
+    parser.add_argument(
+        "-t",
+        "--thinking",
+        type=int,
+        default=DEFAULT_THINKING_BUDGET,
+        help="Thinking budget (tokens)",
+    )
     args = parser.parse_args()
 
     topic = " ".join(args.topic)
@@ -229,6 +260,7 @@ def main():
         query_count=args.queries,
         json_mode=args.json,
         agentic_mode=args.agentic,
+        thinking_budget=args.thinking,
     )
 
     queries = agent.generate_queries(topic)

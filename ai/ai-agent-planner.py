@@ -24,6 +24,7 @@ Flags:
     -f, --files      Path to local files to be used as context for planning
     -p, --provider   AI provider (openai, anthropic, openrouter, or ollama)
     -m, --model      Override the default model name for the provider
+    -t, --thinking   Thinking budget (integer tokens). Default 0.
 """
 
 import sys
@@ -36,7 +37,7 @@ from ai_core.utils import (
     clean_markdown,
 )
 from ai_core.ai_client import call_ai
-from ai_core.config import DEFAULT_PROVIDER, get_default_model
+from ai_core.config import DEFAULT_PROVIDER, get_default_model, DEFAULT_THINKING_BUDGET
 
 
 def main():
@@ -50,6 +51,13 @@ def main():
         default=DEFAULT_PROVIDER,
     )
     parser.add_argument("-m", "--model", help="Override default model")
+    parser.add_argument(
+        "-t",
+        "--thinking",
+        type=int,
+        default=DEFAULT_THINKING_BUDGET,
+        help="Thinking budget (tokens)",
+    )
 
     args = parser.parse_args()
     if not args.goal and not args.files:
@@ -91,7 +99,14 @@ def main():
 
     while True:
         print(f"{CYAN}🔍 Thinking...{RESET}", end="\r")
-        response = call_ai(messages, args.provider, active_model, max_tokens=8192)
+        response = call_ai(
+            messages,
+            args.provider,
+            active_model,
+            max_tokens=8192,
+            thinking_budget=args.thinking,
+        )
+
         sys.stdout.write("\033[2K\r")
 
         if not response:

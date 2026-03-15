@@ -60,7 +60,7 @@ export AI_DEFAULT_PROVIDER="ollama"  # openai, anthropic, openrouter, google
 
 ### Ollama (Local)
 
-Ensure Ollama is running. By default, it uses `qwen2.5-coder:7b`. You can override this:
+Ensure Ollama is running. By default, it uses `qwen3.5:4b`. You can override this:
 
 ```bash
 export OLLAMA_MODEL="llama3.1"

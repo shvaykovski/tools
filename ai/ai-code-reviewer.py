@@ -25,6 +25,7 @@ Flags:
     --files          Specify list of files to review (disables staged git diff review)
     -p, --provider   AI provider (openai, anthropic, openrouter, or ollama)
     -m, --model      Override the default model name for the provider
+    -t, --thinking   Thinking budget (integer tokens). Default 0.
 """
 
 import subprocess
@@ -33,7 +34,7 @@ import argparse
 from ai_core.colors import RED, GREEN, BLUE, RESET, BOLD
 from ai_core.utils import read_files, clean_markdown
 from ai_core.ai_client import call_ai
-from ai_core.config import DEFAULT_PROVIDER, get_default_model
+from ai_core.config import DEFAULT_PROVIDER, get_default_model, DEFAULT_THINKING_BUDGET
 
 
 def get_staged_diff():
@@ -46,7 +47,13 @@ def get_staged_diff():
         return ""
 
 
-def review_code(content: str, provider: str, model: str, is_diff: bool = True) -> bool:
+def review_code(
+    content: str,
+    provider: str,
+    model: str,
+    is_diff: bool = True,
+    thinking_budget: int = 0,
+) -> bool:
     content_type = "git diff" if is_diff else "code files"
     header = "Diff to review:" if is_diff else "Files to review:"
 
@@ -59,7 +66,9 @@ If there are issues, security vulnerabilities, or bugs, respond with 'REJECT' on
 {content}
 """
     messages = [{"role": "user", "content": prompt}]
-    response_text = call_ai(messages, provider, model, temperature=0.1)
+    response_text = call_ai(
+        messages, provider, model, temperature=0.1, thinking_budget=thinking_budget
+    )
     response_text = clean_markdown(response_text) if response_text else ""
 
     if not response_text:
@@ -80,6 +89,13 @@ if __name__ == "__main__":
     parser.add_argument("--files", nargs="+", help="Files to review")
     parser.add_argument("-p", "--provider", help="AI provider")
     parser.add_argument("-m", "--model", help="AI model")
+    parser.add_argument(
+        "-t",
+        "--thinking",
+        type=int,
+        default=DEFAULT_THINKING_BUDGET,
+        help="Thinking budget (tokens)",
+    )
     args = parser.parse_args()
 
     active_provider = args.provider.lower() if args.provider else DEFAULT_PROVIDER
@@ -101,6 +117,12 @@ if __name__ == "__main__":
         f"{BLUE}🤖 Running AI Code Review on {review_type} using {BOLD}{active_model}{RESET} ({active_provider})...{RESET}"
     )
 
-    passed = review_code(content, active_provider, active_model, is_diff=is_diff)
+    passed = review_code(
+        content,
+        active_provider,
+        active_model,
+        is_diff=is_diff,
+        thinking_budget=args.thinking,
+    )
     if not passed:
         sys.exit(1)
