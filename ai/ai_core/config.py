@@ -13,7 +13,7 @@ OPENAI_URL = "https://api.openai.com/v1/chat/completions"
 SEARXNG_URL = os.getenv("SEARXNG_URL", "http://localhost:8889")
 
 # Defaults
-DEFAULT_PROVIDER = "ollama"
+DEFAULT_PROVIDER = os.getenv("AI_DEFAULT_PROVIDER", "ollama")
 
 # Per-provider default models (can be overridden by environment variables)
 PROVIDER_MODELS = {
@@ -27,3 +27,11 @@ PROVIDER_MODELS = {
 def get_default_model(provider):
     """Returns the default model for a given provider."""
     return PROVIDER_MODELS.get(provider, PROVIDER_MODELS["ollama"])
+
+
+# Phase-specific defaults
+RESEARCH_PROVIDER = os.getenv("RESEARCH_PROVIDER", DEFAULT_PROVIDER)
+RESEARCH_MODEL = os.getenv("RESEARCH_MODEL", get_default_model(RESEARCH_PROVIDER))
+
+PLANNER_PROVIDER = os.getenv("PLANNER_PROVIDER", DEFAULT_PROVIDER)
+PLANNER_MODEL = os.getenv("PLANNER_MODEL", get_default_model(PLANNER_PROVIDER))

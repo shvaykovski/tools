@@ -55,6 +55,7 @@ class ResearchAgent:
         limit=5,
         query_count=3,
         json_mode=False,
+        agentic_mode=False,
     ):
         self.provider = provider
         self.model = model or get_default_model(provider)
@@ -62,6 +63,7 @@ class ResearchAgent:
         self.query_count = query_count
         self.searxng_url = SEARXNG_URL
         self.json_mode = json_mode
+        self.agentic_mode = agentic_mode
 
     def log(self, message):
         """Prints message to stderr if json_mode is active, otherwise stdout."""
@@ -209,6 +211,9 @@ def main():
     )
     parser.add_argument("--store", action="store_true")
     parser.add_argument(
+        "-a", "--agentic", action="store_true", help="Optimize output for agentic chain"
+    )
+    parser.add_argument(
         "-j", "--json", action="store_true", help="Output result in JSON format"
     )
     parser.add_argument("-p", "--provider", default=DEFAULT_PROVIDER)
@@ -223,6 +228,7 @@ def main():
         limit=args.limit,
         query_count=args.queries,
         json_mode=args.json,
+        agentic_mode=args.agentic,
     )
 
     queries = agent.generate_queries(topic)
@@ -240,6 +246,10 @@ def main():
         if args.json:
             result_json = {"result": report, "sources": top_urls}
             print(json.dumps(result_json, indent=4))
+        elif args.agentic:
+            # For agentic mode, we print the report with a marker but without extra decoration
+            # The orchestrator will capture this.
+            print(f"\nFINAL REPORT:\n{report}\n")
         else:
             print(f"\n{GREEN}{BOLD}FINAL REPORT:{RESET}\n\n{report}\n")
 

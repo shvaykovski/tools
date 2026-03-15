@@ -20,37 +20,21 @@ import subprocess
 import argparse
 import asyncio
 
-# ANSI Colors for consistency with ai-helper.py
-#
-YELLOW, BLUE, RED, CYAN, GREEN, RESET, BOLD = (
-    "\033[1;33m",
-    "\033[1;34m",
-    "\033[1;31m",
-    "\033[0;36m",
-    "\033[0;32m",
-    "\033[0m",
-    "\033[1m",
+from ai_core.colors import YELLOW, BLUE, RED, GREEN, RESET, BOLD
+from ai_core.utils import get_system_context, read_files_context
+from ai_core.config import (
+    DEFAULT_PROVIDER,
+    RESEARCH_PROVIDER,
+    RESEARCH_MODEL,
+    PLANNER_PROVIDER,
+    PLANNER_MODEL,
 )
 
 
-def read_file_smart(fpath, max_chars=15000):
-    """Smart reader: Extracts the beginning and end of large files to save context."""
-    if not os.path.exists(fpath):
-        return ""
-    try:
-        with open(fpath, "r", encoding="utf-8") as f:
-            content = f.read()
-        if len(content) <= max_chars:
-            return content
-        # Take 40% from head and 40% from tail
-        head = int(max_chars * 0.4)
-        tail = int(max_chars * 0.4)
-        return f"{content[:head]}\n\n[... TRUNCATED {len(content)-max_chars} CHARS ...]\n\n{content[-tail:]}"
-    except Exception as e:
-        return f"[Error reading {fpath}: {e}]"
-
-
 async def main():
+    # Get the directory where this script is located for sibling calls
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+
     parser = argparse.ArgumentParser(description="AI Master Orchestrator")
     parser.add_argument("goal", nargs="+", help="The goal to research and plan")
     parser.add_argument(
@@ -59,54 +43,104 @@ async def main():
     parser.add_argument(
         "--no-search", action="store_true", help="Skip the web research phase"
     )
-    parser.add_argument("-p", "--provider", default="openai", help="AI Provider")
-    parser.add_argument("-m", "--model", help="Override default model")
+    # Global overrides (legacy / convenience)
+    parser.add_argument(
+        "-p", "--provider", default=DEFAULT_PROVIDER, help="Global AI Provider"
+    )
+    parser.add_argument("-m", "--model", help="Global AI Model override")
+
+    # Phase-specific overrides
+    parser.add_argument("--rp", "--research-provider", help="Research phase provider")
+    parser.add_argument("--rm", "--research-model", help="Research phase model")
+    parser.add_argument("--pp", "--plan-provider", help="Planning phase provider")
+    parser.add_argument("--pm", "--plan-model", help="Planning phase model")
+
     args = parser.parse_args()
+
+    # Resolve phase-specific settings
+    # Priority: CLI phase flag > CLI global flag > Env var > Default Provider
+    r_provider = args.rp or (
+        args.provider if args.provider != DEFAULT_PROVIDER else RESEARCH_PROVIDER
+    )
+    r_model = args.rm or args.model or RESEARCH_MODEL
+
+    p_provider = args.pp or (
+        args.provider if args.provider != DEFAULT_PROVIDER else PLANNER_PROVIDER
+    )
+    p_model = args.pm or args.model or PLANNER_MODEL
 
     goal_text = " ".join(args.goal)
     research_summary = ""
 
     # --- PHASE 1: RESEARCH ---
     if not args.no_search:
-        print(f"\n{BLUE}🛰️  Phase 1: Researching Topic...{RESET}")
+        print(f"\n{BLUE}🛰️  Phase 1: Researching Topic via SearXNG...{RESET}")
+        print(
+            f"   Using: {BOLD}{r_provider}{RESET}"
+            + (f" ({r_model})" if r_model else "")
+        )
         try:
-            # Run the researcher script as a subprocess
-            # We assume it's named ai-agent-researcher.py in the same folder
+            research_script = os.path.join(base_dir, "ai-agent-researcher.py")
             research_cmd = [
                 sys.executable,
-                "ai-agent-researcher.py",
+                research_script,
                 goal_text,
                 "-p",
-                args.provider,
+                r_provider,
+                "--agentic",
             ]
-            if args.model:
-                research_cmd += ["-m", args.model]
+            if r_model:
+                research_cmd += ["-m", r_model]
 
-            proc = subprocess.run(research_cmd, capture_output=True, text=True)
+            # Stream output in real-time so the user sees progress
+            proc = subprocess.Popen(
+                research_cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                bufsize=1,
+                universal_newlines=True,
+            )
 
-            if "FINAL RESEARCH REPORT:" in proc.stdout:
-                research_summary = proc.stdout.split("FINAL RESEARCH REPORT:")[
-                    1
-                ].strip()
-                print(f"{GREEN}✅ Research completed with external sources.{RESET}")
+            full_output = []
+            is_reporting = False
+            for line in proc.stdout:
+                # Once we hit the final report, stop streaming to terminal
+                # (but keep capturing for the master context)
+                if "FINAL REPORT:" in line:
+                    is_reporting = True
+
+                if not is_reporting:
+                    sys.stdout.write(line)
+                    sys.stdout.flush()
+
+                full_output.append(line)
+
+            proc.wait()
+            combined_output = "".join(full_output)
+
+            if "FINAL REPORT:" in combined_output:
+                # Capture everything after the FINAL REPORT header
+                parts = combined_output.split("FINAL REPORT:")
+                research_summary = parts[1].strip()
+                print(f"\n{GREEN}✅ Research completed.{RESET}")
             else:
                 print(
-                    f"{YELLOW}⚠️  Research returned no summary. Moving to local context.{RESET}"
+                    f"\n{YELLOW}⚠️  Research returned no summary. Moving to local context.{RESET}"
                 )
         except Exception as e:
-            print(f"{RED}❌ Research phase failed: {e}{RESET}")
+            print(f"\n{RED}❌ Research phase failed: {e}{RESET}")
 
     # --- PHASE 2: MASTER CONTEXT ASSEMBLY ---
     print(f"{BLUE}📂 Phase 2: Assembling Master Context...{RESET}")
-    local_context = ""
-    if args.files:
-        for f in args.files:
-            content = read_file_smart(f)
-            local_context += f"\n--- SOURCE FILE: {f} ---\n{content}\n"
+    local_context = read_files_context(args.files) if args.files else ""
 
     master_context = f"""
 ### MISSION GOAL
 {goal_text}
+
+### SYSTEM CONTEXT
+{get_system_context()}
 
 ### EXTERNAL RESEARCH (WEB DATA)
 {research_summary if research_summary else "N/A - Skip Research"}
@@ -117,19 +151,30 @@ async def main():
 
     # --- PHASE 3: PLANNING HANDOFF ---
     print(f"{BLUE}🧠 Phase 3: Launching Planner Agent...{RESET}")
-    tmp_file = ".master_context.tmp"
+    print(f"   Using: {BOLD}{p_provider}{RESET}" + (f" ({p_model})" if p_model else ""))
+    tmp_file = os.path.join(base_dir, ".master_context.tmp")
     try:
-        with open(tmp_file, "w") as f:
+        with open(tmp_file, "w", encoding="utf-8") as f:
             f.write(master_context)
 
-        # We invoke the planner agent, passing the master context as a file
-        planner_cmd = f"python3 ai-agent-planner.py 'Refer to the master context file for full mission details' -f {tmp_file} -p {args.provider}"
-        if args.model:
-            planner_cmd += f" -m {args.model}"
+        planner_script = os.path.join(base_dir, "ai-agent-planner.py")
+        planner_cmd = [
+            sys.executable,
+            planner_script,
+            "Refer to the master context file for full mission details",
+            "-f",
+            tmp_file,
+            "-p",
+            p_provider,
+        ]
+        if p_model:
+            planner_cmd += ["-m", p_model]
 
-        # Use os.system to maintain the interactive input/output for the loop
-        os.system(planner_cmd)
+        # Use subprocess.run with check=True and inherit stdout/stderr for interactivity
+        subprocess.run(planner_cmd)
 
+    except Exception as e:
+        print(f"{RED}❌ Planning phase failed: {e}{RESET}")
     finally:
         if os.path.exists(tmp_file):
             os.remove(tmp_file)

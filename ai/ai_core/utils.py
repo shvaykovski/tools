@@ -89,18 +89,26 @@ def clean_markdown(text: str) -> str:
 
 
 def save_to_file(content, prefix="output", default_filename=None, extension="md"):
-    """Handles saving content to a file with a filename prompt."""
+    """Handles saving content to a file with a filename prompt and automatic extension."""
+    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     if not default_filename:
-        timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-        default_filename = f"{prefix}-{timestamp}.{extension}"
+        default_base = f"{prefix}-{timestamp}"
+    else:
+        # Strip extension if provided in default_filename for the prompt visibility
+        default_base = os.path.splitext(default_filename)[0]
 
     print(f"\n{BLUE}💾 Saving to file...{RESET}")
-    filename = input(
-        f" Enter filename (default: {YELLOW}{default_filename}{RESET}): "
+    user_input = input(
+        f" Enter filename (default: {YELLOW}{default_base}{RESET}, extension .{extension} auto-added): "
     ).strip()
 
-    if not filename:
-        filename = default_filename
+    base_name = user_input if user_input else default_base
+
+    # Ensure it ends with the correct extension (case-insensitive check)
+    if not base_name.lower().endswith(f".{extension.lower()}"):
+        filename = f"{base_name}.{extension}"
+    else:
+        filename = base_name
 
     try:
         with open(filename, "w", encoding="utf-8") as f:
