@@ -198,7 +198,7 @@ class ResearchAgent:
             {"role": "user", "content": research_context},
         ]
 
-        report = call_ai(messages, self.provider, self.model)
+        report = call_ai(messages, self.provider, self.model, max_tokens=8192)
         return clean_markdown(report) if report else ""
 
 

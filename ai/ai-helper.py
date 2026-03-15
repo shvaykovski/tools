@@ -105,7 +105,7 @@ def main():
     parser.add_argument(
         "-p",
         "--provider",
-        choices=["openai", "anthropic", "openrouter", "ollama"],
+        choices=["openai", "anthropic", "openrouter", "ollama", "google"],
         default=DEFAULT_PROVIDER,
         help="AI provider",
     )

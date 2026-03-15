@@ -28,6 +28,7 @@ from ai_core.config import (
     RESEARCH_MODEL,
     PLANNER_PROVIDER,
     PLANNER_MODEL,
+    get_default_model,
 )
 
 
@@ -62,12 +63,24 @@ async def main():
     r_provider = args.rp or (
         args.provider if args.provider != DEFAULT_PROVIDER else RESEARCH_PROVIDER
     )
-    r_model = args.rm or args.model or RESEARCH_MODEL
+    r_model = args.rm or args.model
+    if not r_model:
+        r_model = (
+            RESEARCH_MODEL
+            if r_provider == RESEARCH_PROVIDER
+            else get_default_model(r_provider)
+        )
 
     p_provider = args.pp or (
         args.provider if args.provider != DEFAULT_PROVIDER else PLANNER_PROVIDER
     )
-    p_model = args.pm or args.model or PLANNER_MODEL
+    p_model = args.pm or args.model
+    if not p_model:
+        p_model = (
+            PLANNER_MODEL
+            if p_provider == PLANNER_PROVIDER
+            else get_default_model(p_provider)
+        )
 
     goal_text = " ".join(args.goal)
     research_summary = ""

@@ -46,7 +46,7 @@ def main():
     parser.add_argument(
         "-p",
         "--provider",
-        choices=["openai", "anthropic", "openrouter", "ollama"],
+        choices=["openai", "anthropic", "openrouter", "ollama", "google"],
         default=DEFAULT_PROVIDER,
     )
     parser.add_argument("-m", "--model", help="Override default model")
@@ -91,7 +91,7 @@ def main():
 
     while True:
         print(f"{CYAN}🔍 Thinking...{RESET}", end="\r")
-        response = call_ai(messages, args.provider, active_model)
+        response = call_ai(messages, args.provider, active_model, max_tokens=8192)
         sys.stdout.write("\033[2K\r")
 
         if not response:
