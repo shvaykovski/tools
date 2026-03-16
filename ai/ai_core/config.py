@@ -15,7 +15,7 @@ SEARXNG_URL = os.getenv("SEARXNG_URL", "http://localhost:8889")
 
 # Defaults
 DEFAULT_PROVIDER = os.getenv("AI_DEFAULT_PROVIDER", "ollama")
-DEFAULT_THINKING_BUDGET = int(os.getenv("AI_DEFAULT_THINKING_BUDGET", "512"))
+DEFAULT_THINKING_BUDGET = int(os.getenv("AI_DEFAULT_THINKING_BUDGET", "0"))
 
 # Per-provider default models (can be overridden by environment variables)
 PROVIDER_MODELS = {
