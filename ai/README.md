@@ -9,6 +9,7 @@ A collection of powerful, modular AI agents and scripts designed to automate res
 | **`ai-orchestrator.py`**     | **Master Agent**       | Chains Research and Planning into a unified agentic flow.         |
 | **`ai-agent-researcher.py`** | **Research Agent**     | Multi-query web search via SearXNG & scraping with `trafilatura`. |
 | **`ai-agent-planner.py`**    | **Planning Agent**     | Iterative technical plan generation with feedback loops.          |
+| **`ai-skill-runner.py`**     | **Skill Runner**       | Run Claude Code skills/agents via any AI provider with auto-routing. |
 | **`ai-helper.py`**           | **Terminal Assistant** | Natural language to shell commands (with execute/copy options).   |
 | **`ai-code-reviewer.py`**    | **Code Reviewer**      | Analyzes staged git changes or specific files for bugs/security.  |
 | **`whisper-transcribe.py`**  | **Transcription**      | Converts audio files to text using OpenAI Whisper.                |
@@ -94,6 +95,30 @@ Generate a plan and provide iterative feedback:
 
 ```bash
 ./ai-agent-planner.py "Refactor my auth logic" -f src/auth.py
+```
+
+### Skill & Agent Runner
+
+Leverage Claude Code skills and agents via any AI provider:
+
+```bash
+# List available skills and agents
+./ai-skill-runner.py --list
+
+# Auto-route to best skill/agent for the request
+./ai-skill-runner.py "Review this code for bugs"
+
+# Explicitly use a specific skill/agent
+./ai-skill-runner.py code-reviewer "Review: def foo(): return 1"
+
+# Interactive multi-turn session with a skill/agent
+./ai-skill-runner.py code-reviewer -i
+
+# Pipe code as context and auto-route
+echo "def broken(): pass" | ./ai-skill-runner.py "Find issues"
+
+# Use with specific provider and model
+./ai-skill-runner.py -p anthropic -m claude-3-5-sonnet-20241022 "Analyze this"
 ```
 
 ### Terminal Assistance
