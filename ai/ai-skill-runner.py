@@ -191,6 +191,7 @@ class SkillRunner:
         thinking_budget: int = 0,
         include_refs: bool = False,
         agentic_mode: bool = False,
+        custom_system: Optional[str] = None,
     ):
         self.provider: str = provider
         self.model: str = model or get_default_model(provider)
@@ -198,6 +199,16 @@ class SkillRunner:
         self.thinking_budget: int = thinking_budget
         self.include_refs: bool = include_refs
         self.agentic_mode: bool = agentic_mode
+
+        # If custom_system is a path to a file, read it
+        self.custom_system: Optional[str] = custom_system
+        if custom_system and os.path.isfile(custom_system):
+            try:
+                with open(custom_system, "r", encoding="utf-8") as f:
+                    self.custom_system = f.read().strip()
+            except Exception as e:
+                self.log(f"Error reading custom system prompt from {custom_system}: {e}")
+
         self.execution_enabled: bool = True
 
     def log(self, message: str, color: Optional[str] = None) -> None:
@@ -439,6 +450,9 @@ class SkillRunner:
             Complete system prompt string.
         """
         prompt: str = ""
+
+        if self.custom_system:
+            prompt += f"# Custom Execution Plan / System Prompt:\n{self.custom_system}\n\n"
 
         if item:
             item_type: str = item.get("type", "item")
@@ -720,6 +734,9 @@ def main() -> None:
     parser.add_argument(
         "--refs", action="store_true", help="Include reference/example files in context"
     )
+    parser.add_argument(
+        "-s", "--system", help="Custom system prompt or plan to inject"
+    )
 
     parsed: argparse.Namespace = parser.parse_args()
 
@@ -730,6 +747,7 @@ def main() -> None:
         thinking_budget=parsed.thinking,
         include_refs=parsed.refs,
         agentic_mode=parsed.agentic,
+        custom_system=parsed.system,
     )
 
     # Discover all items

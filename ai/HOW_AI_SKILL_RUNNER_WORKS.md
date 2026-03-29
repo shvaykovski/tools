@@ -73,6 +73,8 @@ The runner provides a secure, sandboxed execution environment for several langua
 The runner handles input through several channels:
 
 - **Positional Args**: `python3 ai-skill-runner.py <skill> <prompt>`
+- **Custom System Prompts**: `python3 ai-skill-runner.py <skill> -s "Only give high-level feedback" "Review code"`
+- **Prompt from File**: `python3 ai-skill-runner.py <skill> -s plan.md "Run implementation"`
 - **Piped Stdin**: `cat code.py | python3 ai-skill-runner.py review`
 - **Interactive Mode**: `python3 ai-skill-runner.py code-reviewer -i`
 
